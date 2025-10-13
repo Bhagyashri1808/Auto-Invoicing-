@@ -1,0 +1,715 @@
+openapi: 3.0.3
+info:
+  title: Invoice Automation API
+  description: RESTful API for invoice processing with HITL review
+  version: 1.0.0
+  contact:
+    name: Invoice Automation Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /invoices:
+    get:
+      summary: List all invoice documents
+      description: Retrieve paginated list of invoice documents with filtering
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ProcessingStatus'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of invoice documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceDocument'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+    post:
+      summary: Upload new invoice document
+      description: Upload invoice file and start processing
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Invoice file (PDF, JPG, PNG, TIFF)
+              required:
+                - file
+      responses:
+        '201':
+          description: Invoice uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDocument'
+        '400':
+          description: Invalid file format or size
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /invoices/{invoice_id}:
+    get:
+      summary: Get invoice document details
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDocumentDetail'
+        '404':
+          description: Invoice not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete invoice document
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Invoice deleted successfully
+        '404':
+          description: Invoice not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /invoices/{invoice_id}/file:
+    get:
+      summary: Download original invoice file
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice file content
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/tiff:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Invoice or file not found
+
+  /invoices/{invoice_id}/extracted-data:
+    get:
+      summary: Get extracted data for invoice
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Extracted invoice data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractedDataDetail'
+        '404':
+          description: Invoice not found
+
+    put:
+      summary: Update extracted data with corrections
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractedDataUpdate'
+      responses:
+        '200':
+          description: Extracted data updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractedDataDetail'
+        '400':
+          description: Invalid data format
+        '404':
+          description: Invoice not found
+
+  /invoices/{invoice_id}/review:
+    post:
+      summary: Start review session
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Review session started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewSession'
+        '400':
+          description: Review already in progress or invoice not ready
+        '404':
+          description: Invoice not found
+
+    put:
+      summary: Complete review session
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCompletion'
+      responses:
+        '200':
+          description: Review completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewSession'
+        '400':
+          description: Invalid review data
+        '404':
+          description: Invoice or review session not found
+
+  /processing/queue:
+    get:
+      summary: Get processing queue status
+      responses:
+        '200':
+          description: Current processing queue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queue:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProcessingJob'
+                  total_pending:
+                    type: integer
+                  current_processing:
+                    type: integer
+
+  /processing/config:
+    get:
+      summary: Get processing configuration
+      responses:
+        '200':
+          description: Current processing configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingConfig'
+
+    put:
+      summary: Update processing configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessingConfigUpdate'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingConfig'
+        '400':
+          description: Invalid configuration values
+
+  /export:
+    post:
+      summary: Export approved invoice data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format:
+                  type: string
+                  enum: [csv, json]
+                invoice_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                include_line_items:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Exported data
+          content:
+            application/json:
+              schema:
+                type: object
+            text/csv:
+              schema:
+                type: string
+        '400':
+          description: Invalid export parameters
+
+components:
+  schemas:
+    ProcessingStatus:
+      type: string
+      enum:
+        - PENDING
+        - PROCESSING
+        - COMPLETED
+        - FAILED
+        - REVIEWING
+        - APPROVED
+        - REJECTED
+
+    ProcessingMode:
+      type: string
+      enum:
+        - SEQUENTIAL
+        - PARALLEL
+
+    ReviewDecision:
+      type: string
+      enum:
+        - APPROVED
+        - REJECTED
+        - REQUIRES_REPROCESSING
+
+    InvoiceDocument:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        file_type:
+          type: string
+          enum: [PDF, JPG, PNG, TIFF]
+        file_size:
+          type: integer
+        upload_date:
+          type: string
+          format: date-time
+        processing_status:
+          $ref: '#/components/schemas/ProcessingStatus'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - filename
+        - file_type
+        - file_size
+        - upload_date
+        - processing_status
+        - created_at
+        - updated_at
+
+    InvoiceDocumentDetail:
+      allOf:
+        - $ref: '#/components/schemas/InvoiceDocument'
+        - type: object
+          properties:
+            extracted_data:
+              $ref: '#/components/schemas/ExtractedData'
+            review_session:
+              $ref: '#/components/schemas/ReviewSession'
+            processing_job:
+              $ref: '#/components/schemas/ProcessingJob'
+
+    ExtractedData:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendor_name:
+          type: string
+          nullable: true
+        vendor_address:
+          type: string
+          nullable: true
+        invoice_number:
+          type: string
+          nullable: true
+        invoice_date:
+          type: string
+          format: date
+          nullable: true
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        total_amount:
+          type: number
+          format: decimal
+          nullable: true
+        tax_amount:
+          type: number
+          format: decimal
+          nullable: true
+        subtotal_amount:
+          type: number
+          format: decimal
+          nullable: true
+        currency:
+          type: string
+          default: USD
+        extraction_confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+        extracted_at:
+          type: string
+          format: date-time
+        is_human_verified:
+          type: boolean
+          default: false
+      required:
+        - id
+        - extraction_confidence
+        - extracted_at
+        - is_human_verified
+
+    ExtractedDataDetail:
+      allOf:
+        - $ref: '#/components/schemas/ExtractedData'
+        - type: object
+          properties:
+            line_items:
+              type: array
+              items:
+                $ref: '#/components/schemas/LineItem'
+
+    ExtractedDataUpdate:
+      type: object
+      properties:
+        vendor_name:
+          type: string
+          nullable: true
+        vendor_address:
+          type: string
+          nullable: true
+        invoice_number:
+          type: string
+          nullable: true
+        invoice_date:
+          type: string
+          format: date
+          nullable: true
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        total_amount:
+          type: number
+          format: decimal
+          nullable: true
+        tax_amount:
+          type: number
+          format: decimal
+          nullable: true
+        subtotal_amount:
+          type: number
+          format: decimal
+          nullable: true
+        currency:
+          type: string
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItemUpdate'
+
+    LineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+          format: decimal
+          nullable: true
+        unit_price:
+          type: number
+          format: decimal
+          nullable: true
+        total_price:
+          type: number
+          format: decimal
+          nullable: true
+        line_number:
+          type: integer
+          minimum: 1
+        confidence_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+      required:
+        - id
+        - line_number
+        - confidence_score
+
+    LineItemUpdate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+          format: decimal
+          nullable: true
+        unit_price:
+          type: number
+          format: decimal
+          nullable: true
+        total_price:
+          type: number
+          format: decimal
+          nullable: true
+
+    ReviewSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_document_id:
+          type: string
+          format: uuid
+        review_started_at:
+          type: string
+          format: date-time
+        review_completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        time_spent_seconds:
+          type: integer
+          nullable: true
+        corrections_made:
+          type: integer
+          default: 0
+        final_decision:
+          $ref: '#/components/schemas/ReviewDecision'
+        reviewer_notes:
+          type: string
+          nullable: true
+      required:
+        - id
+        - invoice_document_id
+        - review_started_at
+        - corrections_made
+
+    ReviewCompletion:
+      type: object
+      properties:
+        final_decision:
+          $ref: '#/components/schemas/ReviewDecision'
+        reviewer_notes:
+          type: string
+          nullable: true
+      required:
+        - final_decision
+
+    ProcessingJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_document_id:
+          type: string
+          format: uuid
+        queue_position:
+          type: integer
+          minimum: 1
+        processing_mode:
+          $ref: '#/components/schemas/ProcessingMode'
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        retry_count:
+          type: integer
+          default: 0
+        max_retries:
+          type: integer
+          default: 3
+      required:
+        - id
+        - invoice_document_id
+        - queue_position
+        - processing_mode
+        - retry_count
+        - max_retries
+
+    ProcessingConfig:
+      type: object
+      properties:
+        ocr_confidence_threshold:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          default: 0.7
+        processing_mode:
+          $ref: '#/components/schemas/ProcessingMode'
+        max_file_size_mb:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+        auto_save_corrections:
+          type: boolean
+          default: true
+      required:
+        - ocr_confidence_threshold
+        - processing_mode
+        - max_file_size_mb
+        - auto_save_corrections
+
+    ProcessingConfigUpdate:
+      type: object
+      properties:
+        ocr_confidence_threshold:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+        processing_mode:
+          $ref: '#/components/schemas/ProcessingMode'
+        max_file_size_mb:
+          type: integer
+          minimum: 1
+          maximum: 100
+        auto_save_corrections:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          nullable: true
+      required:
+        - error
+        - message

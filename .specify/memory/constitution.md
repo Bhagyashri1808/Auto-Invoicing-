@@ -1,50 +1,46 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report - Constitution v1.0.0
+========================================
+Version change: Template → 1.0.0 (Initial constitution)
+Modified principles: All principles defined (was template placeholders)
+Added sections: Technical Standards, Development Workflow
+Removed sections: None
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md (Web application structure matches React/FastAPI)
+  ✅ .specify/templates/spec-template.md (No changes needed - technology agnostic)
+  ✅ Command files (No changes needed - generic guidance maintained)
+Follow-up TODOs: None - all placeholders resolved
+-->
+
+# Spec-Kit Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Monorepo Structure
+Every feature development MUST respect the clear separation between frontend and backend while maintaining shared tooling and standards. Frontend code resides in `frontend/` using React/Vite, backend code resides in `backend/` using Python/FastAPI. Shared configurations, documentation, and tooling exist at the repository root. Cross-cutting concerns like authentication, logging, and error handling MUST be coordinated between frontend and backend but implemented according to platform conventions.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. API-First Development
+All feature development MUST begin with API contract definition using OpenAPI/FastAPI schemas. Frontend development follows the established API contracts. Database models derive from API schemas using Pydantic. Contract tests validate both sides of the API boundary. No frontend implementation begins until API contracts are defined and validated.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Test-First Methodology (NON-NEGOTIABLE)
+TDD is mandatory across the entire stack. Backend tests use pytest with contract, integration, and unit test layers. Frontend tests use Vitest with component, integration, and unit test layers. Tests MUST be written before implementation. Red-Green-Refactor cycle is strictly enforced. All API endpoints require contract tests. All React components require unit tests.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Type Safety
+Type safety is enforced across the entire application stack. Frontend uses TypeScript with strict configuration. Backend uses Python with Pydantic models for all data validation. API contracts ensure type compatibility between frontend and backend. No `any` types in TypeScript except for legitimate dynamic content. No untyped data structures in Python except for validated external inputs.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Developer Experience
+Development environment MUST provide instant feedback and minimal friction. Frontend uses Vite hot module replacement for instant updates. Backend uses FastAPI auto-reload for development. Automated linting and formatting with pre-commit hooks. Clear error messages and debugging capabilities. Comprehensive documentation for setup, development, and deployment processes.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Technical Standards
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+All code MUST pass automated quality checks before merge. Frontend linting uses ESLint with TypeScript rules, formatting uses Prettier. Backend linting uses Ruff, formatting uses Black, type checking uses mypy. Test coverage MUST be maintained above 80% for new code. Performance budgets enforce frontend bundle size limits and backend response time requirements. Security scanning runs on all dependencies and code changes.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Workflow
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+Feature development follows the SpecKit workflow: specification → planning → implementation → validation. All features require approval of both API contracts and frontend mockups before implementation begins. Code reviews MUST verify compliance with type safety, test coverage, and performance requirements. Deployment requires passing all automated tests and manual QA approval. Breaking changes require migration planning and backward compatibility consideration.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices and tools. All pull requests MUST verify compliance with these principles through automated checks and human review. Complexity that violates these principles MUST be justified with documented rationale and approval. Constitution amendments require documentation of impact, migration plan, and team approval. Runtime development guidance is maintained in `CLAUDE.md` for AI agent integration.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2025-01-10 | **Last Amended**: 2025-01-10
