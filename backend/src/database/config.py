@@ -12,6 +12,12 @@ DATABASE_DIR = Path(__file__).parent.parent.parent.parent / "shared" / "database
 DATABASE_DIR.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = f"sqlite:///{DATABASE_DIR}/invoices.db"
 
+# LLM Integration configuration
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434")
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemma3:4b")
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
+MEMORY_LIMIT_MB = int(os.getenv("MEMORY_LIMIT_MB", "2048"))
+
 # SQLAlchemy engine configuration
 engine = create_engine(
     DATABASE_URL,

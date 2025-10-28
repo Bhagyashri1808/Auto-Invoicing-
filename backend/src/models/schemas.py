@@ -2,10 +2,10 @@
 
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
-from .enums import ProcessingStatus, FileType, ProcessingMode, ReviewDecision, ConfigDataType
+from .enums import ProcessingStatus, FileType, ProcessingMode, ReviewDecision, ConfigDataType, ExtractionMethod
 
 
 # Base schemas
@@ -63,6 +63,17 @@ class ExtractedDataBase(BaseSchema):
     extraction_confidence: float = Field(..., ge=0.0, le=1.0)
     is_human_verified: bool = False
 
+    # Enhanced processing fields
+    extraction_method: ExtractionMethod = ExtractionMethod.OCR_ONLY
+    llm_processing_job_id: Optional[UUID] = None
+    ocr_confidence_avg: Optional[float] = Field(None, ge=0.0, le=1.0)
+    llm_confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
+    field_confidence_scores: Optional[Dict[str, Any]] = None
+    preprocessing_applied: bool = False
+    preprocessing_method: Optional[str] = None
+    validation_errors: Optional[Dict[str, Any]] = None
+    has_manual_corrections: bool = False
+
 
 class ExtractedDataCreate(ExtractedDataBase):
     invoice_document_id: UUID
@@ -88,6 +99,17 @@ class ExtractedDataUpdate(BaseSchema):
     tax_amount: Optional[Decimal] = Field(None, ge=0)
     subtotal_amount: Optional[Decimal] = Field(None, ge=0)
     currency: Optional[str] = Field(None, max_length=3)
+
+    # Enhanced processing fields
+    extraction_method: Optional[ExtractionMethod] = None
+    llm_processing_job_id: Optional[UUID] = None
+    ocr_confidence_avg: Optional[float] = Field(None, ge=0.0, le=1.0)
+    llm_confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
+    field_confidence_scores: Optional[Dict[str, Any]] = None
+    preprocessing_applied: Optional[bool] = None
+    preprocessing_method: Optional[str] = None
+    validation_errors: Optional[Dict[str, Any]] = None
+    has_manual_corrections: Optional[bool] = None
 
 
 class ExtractedDataDetail(ExtractedData):

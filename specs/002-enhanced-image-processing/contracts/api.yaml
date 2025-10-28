@@ -1,0 +1,837 @@
+openapi: 3.0.3
+info:
+  title: Enhanced Invoice Processing API
+  description: Extended RESTful API for invoice processing with LLM integration and advanced preprocessing
+  version: 2.0.0
+  contact:
+    name: Invoice Automation Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  # Extended existing invoice endpoints
+  /invoices:
+    post:
+      summary: Upload invoice with enhanced processing options
+      description: Upload invoice file with optional preprocessing and LLM processing configuration
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Invoice file (PDF, JPG, PNG, TIFF)
+                enable_preprocessing:
+                  type: boolean
+                  default: true
+                  description: Enable image preprocessing
+                preprocessing_config_id:
+                  type: string
+                  format: uuid
+                  description: Custom preprocessing configuration ID (optional)
+                enable_llm_processing:
+                  type: boolean
+                  default: true
+                  description: Enable LLM-based extraction
+                fallback_to_ocr:
+                  type: boolean
+                  default: true
+                  description: Fallback to OCR if LLM processing fails
+              required:
+                - file
+      responses:
+        '201':
+          description: Invoice uploaded successfully with enhanced processing options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnhancedInvoiceDocument'
+        '400':
+          description: Invalid file format, size, or processing options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /invoices/{invoice_id}:
+    get:
+      summary: Get enhanced invoice document details
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: include_processing_details
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include LLM processing job details
+      responses:
+        '200':
+          description: Enhanced invoice document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnhancedInvoiceDocumentDetail'
+
+  /invoices/{invoice_id}/reprocess:
+    post:
+      summary: Reprocess invoice with different settings
+      description: Reprocess existing invoice with different preprocessing or LLM settings
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReprocessingRequest'
+      responses:
+        '202':
+          description: Reprocessing started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobResponse'
+        '404':
+          description: Invoice not found
+
+  # New preprocessing configuration endpoints
+  /preprocessing/configurations:
+    get:
+      summary: List preprocessing configurations
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            default: "default"
+      responses:
+        '200':
+          description: List of preprocessing configurations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configurations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PreprocessingConfiguration'
+
+    post:
+      summary: Create new preprocessing configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreprocessingConfigurationCreate'
+      responses:
+        '201':
+          description: Configuration created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreprocessingConfiguration'
+
+  /preprocessing/configurations/{config_id}:
+    get:
+      summary: Get preprocessing configuration
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Preprocessing configuration details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreprocessingConfiguration'
+
+    put:
+      summary: Update preprocessing configuration
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreprocessingConfigurationUpdate'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreprocessingConfiguration'
+
+  # New LLM processing endpoints
+  /llm/models:
+    get:
+      summary: List available LLM models
+      responses:
+        '200':
+          description: Available LLM models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LLMModel'
+
+  /llm/health:
+    get:
+      summary: Check LLM service health
+      responses:
+        '200':
+          description: LLM service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMHealthStatus'
+        '503':
+          description: LLM service is unavailable
+
+  # Enhanced processing status endpoints
+  /processing/jobs/{job_id}:
+    get:
+      summary: Get detailed processing job status
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Processing job details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMProcessingJobDetail'
+
+  /processing/metrics:
+    get:
+      summary: Get processing performance metrics
+      parameters:
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: extraction_method
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExtractionMethod'
+      responses:
+        '200':
+          description: Processing performance metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingMetrics'
+
+components:
+  schemas:
+    ExtractionMethod:
+      type: string
+      enum:
+        - OCR_ONLY
+        - LLM_PRIMARY
+        - LLM_FALLBACK
+
+    PreprocessingOperation:
+      type: string
+      enum:
+        - THRESHOLD
+        - DESKEW
+        - COMBINED
+
+    EnhancedInvoiceDocument:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            filename:
+              type: string
+            file_type:
+              type: string
+              enum: [PDF, JPG, PNG, TIFF]
+            file_size:
+              type: integer
+            upload_date:
+              type: string
+              format: date-time
+            processing_status:
+              $ref: '#/components/schemas/ProcessingStatus'
+            extraction_method:
+              $ref: '#/components/schemas/ExtractionMethod'
+            preprocessing_applied:
+              type: boolean
+            llm_processing_enabled:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    EnhancedInvoiceDocumentDetail:
+      allOf:
+        - $ref: '#/components/schemas/EnhancedInvoiceDocument'
+        - type: object
+          properties:
+            extracted_data:
+              $ref: '#/components/schemas/EnhancedExtractedData'
+            llm_processing_job:
+              $ref: '#/components/schemas/LLMProcessingJob'
+            performance_metrics:
+              $ref: '#/components/schemas/ProcessingPerformanceMetric'
+
+    EnhancedExtractedData:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendor_name:
+          type: string
+          nullable: true
+        vendor_address:
+          type: string
+          nullable: true
+        invoice_number:
+          type: string
+          nullable: true
+        invoice_date:
+          type: string
+          format: date
+          nullable: true
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        total_amount:
+          type: number
+          format: decimal
+          nullable: true
+        tax_amount:
+          type: number
+          format: decimal
+          nullable: true
+        subtotal_amount:
+          type: number
+          format: decimal
+          nullable: true
+        currency:
+          type: string
+          default: USD
+        extraction_method:
+          $ref: '#/components/schemas/ExtractionMethod'
+        ocr_confidence_avg:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          nullable: true
+        llm_confidence_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          nullable: true
+        field_confidence_scores:
+          type: object
+          description: Confidence scores for individual fields
+          additionalProperties:
+            type: number
+            format: float
+        preprocessing_applied:
+          type: boolean
+        preprocessing_method:
+          type: string
+          nullable: true
+        validation_errors:
+          type: object
+          nullable: true
+        has_manual_corrections:
+          type: boolean
+        extracted_at:
+          type: string
+          format: date-time
+        is_human_verified:
+          type: boolean
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+
+    PreprocessingConfiguration:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+        operation_type:
+          $ref: '#/components/schemas/PreprocessingOperation'
+        target_width:
+          type: integer
+          minimum: 800
+          maximum: 3200
+          default: 1600
+        threshold_block_size:
+          type: integer
+          minimum: 11
+          maximum: 51
+          default: 11
+          description: Must be odd number
+        threshold_constant:
+          type: number
+          format: float
+          minimum: 5.0
+          maximum: 20.0
+          default: 10.0
+        bilateral_filter_d:
+          type: integer
+          minimum: 5
+          maximum: 15
+          default: 9
+        bilateral_sigma_color:
+          type: number
+          format: float
+          minimum: 50.0
+          maximum: 150.0
+          default: 75.0
+        bilateral_sigma_space:
+          type: number
+          format: float
+          minimum: 50.0
+          maximum: 150.0
+          default: 75.0
+        is_default:
+          type: boolean
+          default: false
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - operation_type
+        - target_width
+
+    PreprocessingConfigurationCreate:
+      type: object
+      properties:
+        operation_type:
+          $ref: '#/components/schemas/PreprocessingOperation'
+        target_width:
+          type: integer
+          minimum: 800
+          maximum: 3200
+          default: 1600
+        threshold_block_size:
+          type: integer
+          minimum: 11
+          maximum: 51
+          default: 11
+        threshold_constant:
+          type: number
+          format: float
+          minimum: 5.0
+          maximum: 20.0
+          default: 10.0
+        bilateral_filter_d:
+          type: integer
+          minimum: 5
+          maximum: 15
+          default: 9
+        bilateral_sigma_color:
+          type: number
+          format: float
+          minimum: 50.0
+          maximum: 150.0
+          default: 75.0
+        bilateral_sigma_space:
+          type: number
+          format: float
+          minimum: 50.0
+          maximum: 150.0
+          default: 75.0
+        is_default:
+          type: boolean
+          default: false
+      required:
+        - operation_type
+
+    PreprocessingConfigurationUpdate:
+      type: object
+      properties:
+        operation_type:
+          $ref: '#/components/schemas/PreprocessingOperation'
+        target_width:
+          type: integer
+          minimum: 800
+          maximum: 3200
+        threshold_block_size:
+          type: integer
+          minimum: 11
+          maximum: 51
+        threshold_constant:
+          type: number
+          format: float
+          minimum: 5.0
+          maximum: 20.0
+        bilateral_filter_d:
+          type: integer
+          minimum: 5
+          maximum: 15
+        bilateral_sigma_color:
+          type: number
+          format: float
+          minimum: 50.0
+          maximum: 150.0
+        bilateral_sigma_space:
+          type: number
+          format: float
+          minimum: 50.0
+          maximum: 150.0
+        is_default:
+          type: boolean
+
+    LLMProcessingJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_document_id:
+          type: string
+          format: uuid
+        preprocessing_config_id:
+          type: string
+          format: uuid
+          nullable: true
+        llm_model_name:
+          type: string
+        preprocessed_image_path:
+          type: string
+          nullable: true
+        processing_started_at:
+          type: string
+          format: date-time
+        llm_started_at:
+          type: string
+          format: date-time
+          nullable: true
+        llm_completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        processing_completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        timeout_occurred:
+          type: boolean
+        fallback_triggered:
+          type: boolean
+        error_message:
+          type: string
+          nullable: true
+        retry_count:
+          type: integer
+        max_retries:
+          type: integer
+        memory_peak_mb:
+          type: integer
+          nullable: true
+        processing_duration_ms:
+          type: integer
+          nullable: true
+
+    LLMProcessingJobDetail:
+      allOf:
+        - $ref: '#/components/schemas/LLMProcessingJob'
+        - type: object
+          properties:
+            llm_request_payload:
+              type: object
+              nullable: true
+            llm_response_raw:
+              type: object
+              nullable: true
+            llm_response_validated:
+              type: object
+              nullable: true
+
+    LLMModel:
+      type: object
+      properties:
+        name:
+          type: string
+        display_name:
+          type: string
+        description:
+          type: string
+        size_gb:
+          type: number
+          format: float
+        recommended_ram_gb:
+          type: integer
+        is_available:
+          type: boolean
+        is_recommended:
+          type: boolean
+
+    LLMHealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unavailable]
+        model_loaded:
+          type: string
+          nullable: true
+        response_time_ms:
+          type: integer
+          nullable: true
+        memory_usage_mb:
+          type: integer
+          nullable: true
+        last_check:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+          nullable: true
+
+    ProcessingPerformanceMetric:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_document_id:
+          type: string
+          format: uuid
+        processing_date:
+          type: string
+          format: date
+        extraction_method:
+          $ref: '#/components/schemas/ExtractionMethod'
+        preprocessing_duration_ms:
+          type: integer
+          nullable: true
+        ocr_duration_ms:
+          type: integer
+          nullable: true
+        llm_duration_ms:
+          type: integer
+          nullable: true
+        total_duration_ms:
+          type: integer
+        memory_peak_mb:
+          type: number
+          format: float
+        file_size_mb:
+          type: number
+          format: float
+        image_dimensions:
+          type: string
+        preprocessing_applied:
+          type: boolean
+        timeout_occurred:
+          type: boolean
+        error_occurred:
+          type: boolean
+        accuracy_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          nullable: true
+        user_corrections_count:
+          type: integer
+
+    ProcessingMetrics:
+      type: object
+      properties:
+        total_processed:
+          type: integer
+        success_rate:
+          type: number
+          format: float
+        average_processing_time_ms:
+          type: integer
+        average_accuracy_score:
+          type: number
+          format: float
+          nullable: true
+        method_breakdown:
+          type: object
+          properties:
+            ocr_only:
+              type: integer
+            llm_primary:
+              type: integer
+            llm_fallback:
+              type: integer
+        daily_metrics:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              processed_count:
+                type: integer
+              average_duration_ms:
+                type: integer
+              success_rate:
+                type: number
+                format: float
+
+    ReprocessingRequest:
+      type: object
+      properties:
+        preprocessing_config_id:
+          type: string
+          format: uuid
+          nullable: true
+        enable_preprocessing:
+          type: boolean
+          default: true
+        enable_llm_processing:
+          type: boolean
+          default: true
+        force_reprocess:
+          type: boolean
+          default: false
+          description: Force reprocessing even if previous attempt was successful
+
+    ProcessingJobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        estimated_completion_time:
+          type: string
+          format: date-time
+          nullable: true
+
+    # Inherited from original API
+    ProcessingStatus:
+      type: string
+      enum:
+        - PENDING
+        - PROCESSING
+        - COMPLETED
+        - FAILED
+        - REVIEWING
+        - APPROVED
+        - REJECTED
+
+    LineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+          format: decimal
+          nullable: true
+        unit_price:
+          type: number
+          format: decimal
+          nullable: true
+        total_price:
+          type: number
+          format: decimal
+          nullable: true
+        line_number:
+          type: integer
+          minimum: 1
+        confidence_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+      required:
+        - id
+        - line_number
+        - confidence_score
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          nullable: true
+        processing_context:
+          type: object
+          nullable: true
+          properties:
+            preprocessing_attempted:
+              type: boolean
+            llm_attempted:
+              type: boolean
+            fallback_used:
+              type: boolean
+      required:
+        - error
+        - message

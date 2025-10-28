@@ -1,10 +1,11 @@
 """Extracted data model for structured invoice information."""
 
 from datetime import date, datetime
-from sqlalchemy import Column, String, Numeric, Date, DateTime, Boolean, Float, ForeignKey
+from sqlalchemy import Column, String, Numeric, Date, DateTime, Boolean, Float, ForeignKey, Enum, JSON, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from .base import BaseModel
+from .enums import ExtractionMethod
 
 
 class ExtractedData(BaseModel):
@@ -39,7 +40,18 @@ class ExtractedData(BaseModel):
     extraction_confidence = Column(Float, nullable=False)
     extracted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     is_human_verified = Column(Boolean, default=False, nullable=False)
-    
+
+    # Enhanced processing fields
+    extraction_method = Column(Enum(ExtractionMethod), default=ExtractionMethod.OCR_ONLY, nullable=False)
+    llm_processing_job_id = Column(UUID(as_uuid=True), ForeignKey("llm_processing_jobs.id", ondelete="SET NULL"), nullable=True)
+    ocr_confidence_avg = Column(Float, nullable=True)
+    llm_confidence_score = Column(Float, nullable=True)
+    field_confidence_scores = Column(JSON, nullable=True)
+    preprocessing_applied = Column(Boolean, default=False, nullable=False)
+    preprocessing_method = Column(String(255), nullable=True)
+    validation_errors = Column(JSON, nullable=True)
+    has_manual_corrections = Column(Boolean, default=False, nullable=False)
+
     # Relationships
     invoice_document = relationship("InvoiceDocument", back_populates="extracted_data")
     line_items = relationship("LineItem", back_populates="extracted_data", cascade="all, delete-orphan")

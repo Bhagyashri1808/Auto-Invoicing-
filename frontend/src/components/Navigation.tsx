@@ -4,7 +4,15 @@ import { Link, useLocation } from 'react-router-dom'
 const Navigation: React.FC = () => {
   const location = useLocation()
 
-  const isActive = (path: string) => location.pathname === path
+  const isActive = (path: string) => {
+    if (path === '/documents') {
+      return location.pathname === '/documents' || location.pathname.startsWith('/documents/')
+    }
+    if (path === '/review') {
+      return location.pathname.startsWith('/review/')
+    }
+    return location.pathname === path
+  }
 
   return (
     <nav className="navigation">

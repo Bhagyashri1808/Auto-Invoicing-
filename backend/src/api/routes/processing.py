@@ -1,5 +1,6 @@
 """API routes for processing management."""
 
+import uuid
 import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -228,9 +229,18 @@ async def get_document_extracted_data(
     Returns:
         ExtractedDataResponse with data details
     """
+    try:
+        # Convert string to UUID
+        doc_uuid = uuid.UUID(document_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid document ID format"
+        )
+    
     # Verify document exists
     document = db.query(InvoiceDocument).filter(
-        InvoiceDocument.id == document_id
+        InvoiceDocument.id == doc_uuid
     ).first()
     
     if not document:
@@ -241,7 +251,7 @@ async def get_document_extracted_data(
     
     # Get extracted data
     extracted_data = db.query(ExtractedData).filter(
-        ExtractedData.invoice_document_id == document_id
+        ExtractedData.invoice_document_id == doc_uuid
     ).first()
     
     if not extracted_data:
@@ -270,9 +280,18 @@ async def start_review_session(
     Returns:
         ReviewSessionResponse with session details
     """
+    try:
+        # Convert string to UUID
+        doc_uuid = uuid.UUID(document_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid document ID format"
+        )
+    
     # Verify document exists and has extracted data
     document = db.query(InvoiceDocument).filter(
-        InvoiceDocument.id == document_id
+        InvoiceDocument.id == doc_uuid
     ).first()
     
     if not document:
@@ -288,7 +307,7 @@ async def start_review_session(
         )
     
     extracted_data = db.query(ExtractedData).filter(
-        ExtractedData.invoice_document_id == document_id
+        ExtractedData.invoice_document_id == doc_uuid
     ).first()
     
     if not extracted_data:
@@ -301,7 +320,7 @@ async def start_review_session(
         # Create review session
         review_session = ReviewSession(
             **session_data.dict(),
-            invoice_document_id=document_id,
+            invoice_document_id=doc_uuid,
             extracted_data_id=extracted_data.id
         )
         

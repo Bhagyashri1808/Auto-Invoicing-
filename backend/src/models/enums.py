@@ -41,3 +41,10 @@ class ConfigDataType(enum.Enum):
     INTEGER = "INTEGER"
     FLOAT = "FLOAT"
     BOOLEAN = "BOOLEAN"
+
+
+class ExtractionMethod(enum.Enum):
+    """Extraction method enumeration."""
+    OCR_ONLY = "OCR_ONLY"
+    LLM_PRIMARY = "LLM_PRIMARY"
+    LLM_FALLBACK = "LLM_FALLBACK"

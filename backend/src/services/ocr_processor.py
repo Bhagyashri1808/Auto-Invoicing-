@@ -222,6 +222,24 @@ class OCRProcessor:
             OCRResult with extracted text and confidence
         """
         try:
+            # Check if tesseract is available by trying to get version
+            try:
+                pytesseract.get_tesseract_version()
+            except Exception as tesseract_error:
+                error_msg = str(tesseract_error)
+                if "tesseract is not installed" in error_msg or "not in your PATH" in error_msg:
+                    return OCRResult(
+                        text="",
+                        confidence=0.0,
+                        error="OCR failed: tesseract is not installed or it's not in your PATH. See README file for more information."
+                    )
+                else:
+                    return OCRResult(
+                        text="",
+                        confidence=0.0,
+                        error=f"OCR failed: {error_msg}"
+                    )
+            
             # Extract text with confidence data
             ocr_data = pytesseract.image_to_data(
                 image,

@@ -40,12 +40,14 @@ class DataExtractor:
     
     def _setup_patterns(self):
         """Setup regex patterns for data extraction."""
-        # Invoice number patterns
+        # Invoice number patterns - precise matching only, avoid partial word matches
         self.invoice_number_patterns = [
-            r'invoice\s*#?\s*:?\s*([A-Za-z0-9\-_]+)',
-            r'inv\s*#?\s*:?\s*([A-Za-z0-9\-_]+)',
-            r'#\s*([A-Za-z0-9\-_]+)',
-            r'number\s*:?\s*([A-Za-z0-9\-_]+)',
+            r'invoice\s+number\s*:?\s*([A-Za-z0-9\-_./]+)',  # "Invoice Number: INV-001"
+            r'invoice\s*#\s*:?\s*([A-Za-z0-9\-_./]+)',       # "Invoice #: INV-001"
+            r'(?:^|\n)\s*inv\s*#\s*:?\s*([A-Za-z0-9\-_./]+)',# "Inv #: INV-001" (start of line)
+            r'(?:^|\n)\s*#\s*([A-Za-z0-9\-_./]+)',           # "#INV-001" at start of line  
+            r'(?:^|\n)\s*inv\s+no\.?\s*:?\s*([A-Za-z0-9\-_./]+)', # "Inv No: ABC-123" (start of line)
+            r'(?:^|\n)\s*inv\b\s*:?\s*([A-Za-z0-9\-_./]+)',  # "Inv: ABC-123" (word boundary)
         ]
         
         # Date patterns
@@ -64,13 +66,11 @@ class DataExtractor:
             r'(\d+\.\d{2})',                           # Simple decimal
         ]
         
-        # Vendor patterns (usually at top of invoice)
+        # Vendor patterns (usually at top of invoice) - improved to avoid invoice metadata
         self.vendor_patterns = [
-            r'from\s*:?\s*(.+?)(?:\n.*?(?:bill\s+to|invoice\s+to|to\s*:|date|amount))',
+            r'from\s*:?\s*([^\n]+(?:\n[^\n]+)*?)(?=\n.*?(?:invoice\s+(?:number|date|#)|bill\s+to|customer|date\s*:|amount\s*:|total\s*:))',
             r'vendor\s*:?\s*(.+?)(?:\n|$)',
             r'bill\s+from\s*:?\s*(.+?)(?:\n.*?(?:bill\s+to|invoice\s+to))',
-            # More specific pattern that looks for company info before "Bill To" or invoice metadata
-            r'^([^\n]+(?:\n[^\n]*address[^\n]*)?[^\n]*)(?:\n.*?(?:bill\s+to|invoice\s+(?:number|date)|customer))',
         ]
         
         # Tax patterns
