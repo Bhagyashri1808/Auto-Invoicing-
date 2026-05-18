@@ -106,7 +106,7 @@ const UploadPage: React.FC = () => {
   return (
     <div className="upload-page">
       <div className="page-header">
-        <h1 className="page-title">Upload Invoice Documents</h1>
+        <h1 className="page-title">Upload Documents</h1>
         <p className="page-description">
           Upload PDF, JPG, PNG, or TIFF files for automatic invoice processing and data extraction.
         </p>
