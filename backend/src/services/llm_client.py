@@ -121,12 +121,17 @@ class LLMClient:
 
         # Prepare the prompt
         prompt = custom_prompt or self._create_extraction_prompt()
-        print(image_path, "IMAGE FILE PATH")
+
         # Read and encode the image in base64 for vision model
         try:
             with open(image_path, 'rb') as image_file:
                 image_data = image_file.read()
                 image_base64 = base64.b64encode(image_data).decode('utf-8')
+
+            # Debug logging to verify correct image is being sent
+            self.logger.info(f"Processing image: {image_path}")
+            self.logger.info(f"Image size: {len(image_data)} bytes")
+            self.logger.info(f"Base64 hash (first 50 chars): {image_base64[:50]}")
         except Exception as e:
             raise ProcessingError(
                 message=f"Failed to read image file: {e}",
@@ -142,10 +147,12 @@ class LLMClient:
                     "prompt": prompt,
                     "images": [image_base64],  # Include base64-encoded image
                     "stream": False,
+                    "context": [],  # Clear context to force fresh analysis of current image only
                     "options": {
                         "temperature": 0.1,  # Low temperature for consistent extraction
                         "top_p": 0.9,
-                        "num_predict": 1000  # max_tokens equivalent for Ollama
+                        "num_predict": 1000,  # max_tokens equivalent for Ollama
+                        "num_ctx": 2048  # Context window size
                     }
                 }
                 
@@ -185,63 +192,10 @@ class LLMClient:
     def _create_extraction_prompt(self) -> str:
         """Create prompt for invoice data extraction."""
         return """
-You are an expert at extracting structured data from invoice documents.
-Analyze the provided invoice image and extract ALL the actual information you can see.
+You are an expert data extractor. Analyze this invoice image carefully and extract the actual text and numbers you can see.
 
-CRITICAL: Extract the ACTUAL text and numbers from the image, NOT placeholder descriptions!
 
-Return the data in this exact JSON format:
-
-{
-    "vendor_name": <actual company/vendor name from invoice>,
-    "vendor_address": <actual full address from invoice>,
-    "invoice_number": <actual invoice/document number>,
-    "invoice_date": <actual date in YYYY-MM-DD format>,
-    "due_date": <actual due date in YYYY-MM-DD format>,
-    "total_amount": <actual total amount as number>,
-    "tax_amount": <actual tax/GST amount as number>,
-    "subtotal_amount": <actual subtotal as number>,
-    "currency": <currency code like USD, AUD, EUR>,
-    "line_items": [
-        {
-            "description": <actual item/service description>,
-            "quantity": <actual quantity as number>,
-            "unit_price": <actual price per unit as number>,
-            "total_price": <actual line total as number>
-        }
-    ]
-}
-
-Example of CORRECT extraction from an invoice:
-{
-    "vendor_name": "Bhagyshri Patil",
-    "vendor_address": "Melbourne, Australia",
-    "invoice_number": "INV-2025-001",
-    "invoice_date": "2025-10-13",
-    "due_date": "2025-10-27",
-    "total_amount": 3767.50,
-    "tax_amount": 342.50,
-    "subtotal_amount": 3425.00,
-    "currency": "AUD",
-    "line_items": [
-        {
-            "description": "Frontend development (React.js)",
-            "quantity": 25,
-            "unit_price": 85,
-            "total_price": 2125.00
-        }
-    ]
-}
-
-Important rules:
-- Read ALL text carefully from the image
-- Extract REAL data, not field descriptions
-- Use null only if information is truly missing
-- Numeric values must be numbers, not strings
-- For dates use YYYY-MM-DD format
-- Include ALL line items you can see
-
-Return ONLY the JSON, no other text.
+Read carefully, extract real text/numbers. format the text either into bullet points or json.
 """
     
     async def _process_llm_response(

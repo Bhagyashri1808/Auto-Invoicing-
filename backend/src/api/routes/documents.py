@@ -43,7 +43,7 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     processing_mode: ProcessingMode = ProcessingMode.SEQUENTIAL,
-    enable_preprocessing: bool = Form(True),
+    enable_preprocessing: bool = Form(False),  # Disabled: THRESHOLD destroys handwriting details
     preprocessing_config_id: Optional[str] = Form(None),
     enable_llm_processing: bool = Form(True),
     fallback_to_ocr: bool = Form(True),

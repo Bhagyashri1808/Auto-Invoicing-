@@ -282,3 +282,122 @@ CRITICAL: Return ONLY the JSON, no other text. Extract exactly what you see in t
             extraction_confidence=0.0,
             extracted_at=datetime.utcnow()
         )
+
+    async def extract_data(self, image_path: str) -> Dict:
+        """
+        Extract data from image for enhanced extractor compatibility.
+
+        Args:
+            image_path: Path to image file
+
+        Returns:
+            Dictionary with extracted_data and processing_metadata
+        """
+        import time
+        start_time = time.time()
+
+        try:
+            # Extract text
+            text = self._extract_text_safely(image_path)
+
+            if not text.strip():
+                logger.warning("No text extracted from document")
+                return {
+                    "extracted_data": {
+                        "vendor_name": None,
+                        "vendor_address": None,
+                        "invoice_number": None,
+                        "invoice_date": None,
+                        "due_date": None,
+                        "total_amount": None,
+                        "tax_amount": None,
+                        "subtotal_amount": None,
+                        "currency": "USD",
+                        "line_items": []
+                    },
+                    "processing_metadata": {
+                        "method": "OCR",
+                        "confidence_avg": 0.0,
+                        "processing_time_ms": int((time.time() - start_time) * 1000),
+                        "error": "No text extracted"
+                    }
+                }
+
+            logger.info(f"Extracted text: {text[:100]}...")
+
+            # Use LLM to structure the text
+            structured_data = self._extract_with_llm(text)
+
+            if structured_data.get("error"):
+                return {
+                    "extracted_data": {
+                        "vendor_name": None,
+                        "vendor_address": None,
+                        "invoice_number": None,
+                        "invoice_date": None,
+                        "due_date": None,
+                        "total_amount": None,
+                        "tax_amount": None,
+                        "subtotal_amount": None,
+                        "currency": "USD",
+                        "line_items": []
+                    },
+                    "processing_metadata": {
+                        "method": "OCR",
+                        "confidence_avg": 0.0,
+                        "processing_time_ms": int((time.time() - start_time) * 1000),
+                        "error": structured_data["error"]
+                    }
+                }
+
+            # Parse structured data
+            result = self._parse_llm_response(structured_data)
+
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            return {
+                "extracted_data": {
+                    "vendor_name": result.get("vendor_name"),
+                    "vendor_address": result.get("vendor_address"),
+                    "invoice_number": result.get("invoice_number"),
+                    "invoice_date": result.get("invoice_date"),
+                    "due_date": result.get("due_date"),
+                    "total_amount": result.get("total_amount"),
+                    "tax_amount": result.get("tax_amount"),
+                    "subtotal_amount": result.get("subtotal_amount"),
+                    "currency": result.get("currency", "USD"),
+                    "line_items": result.get("line_items", [])
+                },
+                "processing_metadata": {
+                    "method": "OCR",
+                    "confidence_avg": result.get("extraction_confidence", 0.0),
+                    "processing_time_ms": processing_time_ms
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"OCR extraction failed: {str(e)}")
+            return {
+                "extracted_data": {
+                    "vendor_name": None,
+                    "vendor_address": None,
+                    "invoice_number": None,
+                    "invoice_date": None,
+                    "due_date": None,
+                    "total_amount": None,
+                    "tax_amount": None,
+                    "subtotal_amount": None,
+                    "currency": "USD",
+                    "line_items": []
+                },
+                "processing_metadata": {
+                    "method": "OCR",
+                    "confidence_avg": 0.0,
+                    "processing_time_ms": int((time.time() - start_time) * 1000),
+                    "error": str(e)
+                }
+            }
+
+
+# Global instance
+simple_extractor = SimpleOCRExtractor()

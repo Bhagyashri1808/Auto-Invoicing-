@@ -15,7 +15,7 @@ DATABASE_URL = f"sqlite:///{DATABASE_DIR}/invoices.db"
 # LLM Integration configuration
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434")
 LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemma3:4b")
-LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "180"))  # 3 minutes for vision model processing
 MEMORY_LIMIT_MB = int(os.getenv("MEMORY_LIMIT_MB", "2048"))
 
 # SQLAlchemy engine configuration

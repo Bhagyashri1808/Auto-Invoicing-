@@ -10,6 +10,8 @@ from .llm_client import llm_client
 from .confidence_calculator import confidence_calculator
 from .error_handler import error_handler, ErrorType, ProcessingError
 from .file_cleanup import file_cleanup_service
+from .pdf_converter import pdf_converter
+from .simple_ocr_extractor import simple_extractor
 from models.preprocessing import PreprocessingOperation
 
 
@@ -45,12 +47,32 @@ class EnhancedExtractor:
             "preprocessing_attempted": False,
             "llm_attempted": False,
             "fallback_used": False,
-            "extraction_method": "OCR_ONLY"
+            "extraction_method": "OCR_ONLY",
+            "pdf_converted": False
         }
-        
+
         try:
+            # Step 0: Convert PDF to image if necessary
+            working_image_path = image_path
+            pdf_converted = False
+
+            if pdf_converter.is_pdf(image_path):
+                self.logger.info(f"PDF detected, converting to image: {image_path}")
+                try:
+                    working_image_path = pdf_converter.convert_first_page(image_path)
+                    pdf_converted = True
+                    processing_context["pdf_converted"] = True
+                    self.logger.info(f"PDF converted to: {working_image_path}")
+                except Exception as e:
+                    self.logger.error(f"PDF conversion failed: {e}")
+                    raise error_handler.handle_preprocessing_error(
+                        operation="pdf_conversion",
+                        file_path=image_path,
+                        error=e
+                    )
+
             # Step 1: Preprocessing (if enabled)
-            processed_image_path = image_path
+            processed_image_path = working_image_path
             preprocessing_metadata = {}
             
             if enable_preprocessing:
@@ -59,20 +81,20 @@ class EnhancedExtractor:
                 
                 try:
                     preprocessing_result = await self._apply_preprocessing(
-                        image_path, preprocessing_config
+                        working_image_path, preprocessing_config
                     )
                     print(preprocessing_result)
                     processed_image_path = preprocessing_result["processed_image_path"]
                     preprocessing_metadata = preprocessing_result["processing_metadata"]
-                    
+
                     self.logger.info(f"Preprocessing completed: {processed_image_path}")
-                    
+
                 except Exception as e:
                     self.logger.warning(f"Preprocessing failed: {e}")
                     if not fallback_to_ocr:
                         raise
-                    # Continue with original image if fallback is enabled
-                    processed_image_path = image_path
+                    # Continue with working image (PDF converted or original) if fallback is enabled
+                    processed_image_path = working_image_path
             
             # Step 2: LLM Extraction (if enabled)
             extraction_result = None
@@ -169,14 +191,22 @@ class EnhancedExtractor:
             if processed_image_path != image_path:
                 # Schedule cleanup of preprocessed image
                 file_cleanup_service.cleanup_preprocessed_image(processed_image_path)
-            
+
+            # Cleanup PDF-converted image if it was created
+            if pdf_converted and working_image_path != image_path:
+                file_cleanup_service.cleanup_preprocessed_image(working_image_path)
+
             self.logger.info(f"Enhanced extraction completed in {total_processing_time_ms}ms")
             return result
-            
+
         except Exception as e:
             # Ensure cleanup on error
             if 'processed_image_path' in locals() and processed_image_path != image_path:
                 file_cleanup_service.cleanup_preprocessed_image(processed_image_path)
+
+            # Cleanup PDF-converted image on error
+            if 'pdf_converted' in locals() and pdf_converted and 'working_image_path' in locals() and working_image_path != image_path:
+                file_cleanup_service.cleanup_preprocessed_image(working_image_path)
             
             # Re-raise with processing context
             if isinstance(e, ProcessingError):
@@ -224,32 +254,38 @@ class EnhancedExtractor:
     
     async def _apply_ocr_extraction(self, image_path: str) -> Dict[str, Any]:
         """Apply OCR extraction as fallback method."""
-        # This would integrate with the existing OCR service
-        # For now, we'll create a placeholder that returns empty data
-        
-        # In a real implementation, this would call the existing OCR processor
-        # from src.services.ocr_processor import ocr_processor
-        # return await ocr_processor.extract_data(image_path)
-        
-        return {
-            "extracted_data": {
-                "vendor_name": None,
-                "vendor_address": None,
-                "invoice_number": None,
-                "invoice_date": None,
-                "due_date": None,
-                "total_amount": None,
-                "tax_amount": None,
-                "subtotal_amount": None,
-                "currency": "USD",
-                "line_items": []
-            },
-            "processing_metadata": {
-                "method": "OCR",
-                "confidence_avg": 0.0,
-                "processing_time_ms": 100
+        self.logger.info(f"Applying OCR extraction: {image_path}")
+
+        try:
+            # Use the existing simple OCR extractor
+            ocr_result = await simple_extractor.extract_data(image_path)
+
+            self.logger.info("OCR extraction completed successfully")
+            return ocr_result
+
+        except Exception as e:
+            self.logger.error(f"OCR extraction failed: {e}")
+            # Return empty data as last resort
+            return {
+                "extracted_data": {
+                    "vendor_name": None,
+                    "vendor_address": None,
+                    "invoice_number": None,
+                    "invoice_date": None,
+                    "due_date": None,
+                    "total_amount": None,
+                    "tax_amount": None,
+                    "subtotal_amount": None,
+                    "currency": "USD",
+                    "line_items": []
+                },
+                "processing_metadata": {
+                    "method": "OCR",
+                    "confidence_avg": 0.0,
+                    "processing_time_ms": 100,
+                    "error": str(e)
+                }
             }
-        }
     
     def _get_processing_steps(self, context: Dict[str, Any]) -> list:
         """Generate list of processing steps that were executed."""
